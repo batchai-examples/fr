@@ -1,0 +1,135 @@
+import pytest
+from ultralytics.data import (
+    BaseDataset, ClassificationDataset, SemanticDataset, YOLODataset, YOLOMultiModalDataset, YOLOConcatDataset,
+    GroundingDataset, build_yolo_dataset, build_grounding, build_dataloader, load_inference_source
+)
+
+class TestBaseDataset:
+    """Test cases for BaseDataset class."""
+
+    def test_base_dataset_creation(self):
+        """Test creating an instance of BaseDataset."""
+        dataset = BaseDataset()
+        assert isinstance(dataset, BaseDataset)
+
+    def test_base_dataset_methods(self):
+        """Test methods in BaseDataset."""
+        dataset = BaseDataset()
+        with pytest.raises(NotImplementedError):
+            dataset.load_data()
+
+class TestClassificationDataset:
+    """Test cases for ClassificationDataset class."""
+
+    def test_classification_dataset_creation(self):
+        """Test creating an instance of ClassificationDataset."""
+        dataset = ClassificationDataset()
+        assert isinstance(dataset, ClassificationDataset)
+
+    def test_classification_dataset_methods(self):
+        """Test methods in ClassificationDataset."""
+        dataset = ClassificationDataset()
+        with pytest.raises(NotImplementedError):
+            dataset.load_data()
+
+class TestSemanticDataset:
+    """Test cases for SemanticDataset class."""
+
+    def test_semantic_dataset_creation(self):
+        """Test creating an instance of SemanticDataset."""
+        dataset = SemanticDataset()
+        assert isinstance(dataset, SemanticDataset)
+
+    def test_semantic_dataset_methods(self):
+        """Test methods in SemanticDataset."""
+        dataset = SemanticDataset()
+        with pytest.raises(NotImplementedError):
+            dataset.load_data()
+
+class TestYOLODataset:
+    """Test cases for YOLODataset class."""
+
+    def test_yolo_dataset_creation(self):
+        """Test creating an instance of YOLODataset."""
+        dataset = YOLODataset()
+        assert isinstance(dataset, YOLODataset)
+
+    def test_yolo_dataset_methods(self):
+        """Test methods in YOLODataset."""
+        dataset = YOLODataset()
+        with pytest.raises(NotImplementedError):
+            dataset.load_data()
+
+class TestYOLOMultiModalDataset:
+    """Test cases for YOLOMultiModalDataset class."""
+
+    def test_yolomultimodal_dataset_creation(self):
+        """Test creating an instance of YOLOMultiModalDataset."""
+        dataset = YOLOMultiModalDataset()
+        assert isinstance(dataset, YOLOMultiModalDataset)
+
+    def test_yolomultimodal_dataset_methods(self):
+        """Test methods in YOLOMultiModalDataset."""
+        dataset = YOLOMultiModalDataset()
+        with pytest.raises(NotImplementedError):
+            dataset.load_data()
+
+class TestYOLOConcatDataset:
+    """Test cases for YOLOConcatDataset class."""
+
+    def test_yolocat_dataset_creation(self):
+        """Test creating an instance of YOLOConcatDataset."""
+        dataset = YOLOConcatDataset()
+        assert isinstance(dataset, YOLOConcatDataset)
+
+    def test_yolocat_dataset_methods(self):
+        """Test methods in YOLOConcatDataset."""
+        dataset = YOLOConcatDataset()
+        with pytest.raises(NotImplementedError):
+            dataset.load_data()
+
+class TestGroundingDataset:
+    """Test cases for GroundingDataset class."""
+
+    def test_grounding_dataset_creation(self):
+        """Test creating an instance of GroundingDataset."""
+        dataset = GroundingDataset()
+        assert isinstance(dataset, GroundingDataset)
+
+    def test_grounding_dataset_methods(self):
+        """Test methods in GroundingDataset."""
+        dataset = GroundingDataset()
+        with pytest.raises(NotImplementedError):
+            dataset.load_data()
+
+class TestBuildYOLODataset:
+    """Test cases for build_yolo_dataset function."""
+
+    def test_build_yolo_dataset_creation(self):
+        """Test creating an instance of YOLODataset using build_yolo_dataset."""
+        dataset = build_yolo_dataset()
+        assert isinstance(dataset, YOLODataset)
+
+class TestBuildGrounding:
+    """Test cases for build_grounding function."""
+
+    def test_build_grounding_creation(self):
+        """Test creating an instance of GroundingDataset using build_grounding."""
+        dataset = build_grounding()
+        assert isinstance(dataset, GroundingDataset)
+
+class TestBuildDataloader:
+    """Test cases for build_dataloader function."""
+
+    def test_build_dataloader_creation(self):
+        """Test creating a dataloader using build_dataloader."""
+        dataloader = build_dataloader()
+        assert isinstance(dataloader, DataLoader)
+
+class TestLoadInferenceSource:
+    """Test cases for load_inference_source function."""
+
+    def test_load_inference_source_creation(self):
+        """Test loading an inference source using load_inference_source."""
+        source = load_inference_source("test_source")
+        assert source == "test_source"

@@ -1,0 +1,65 @@
+import pytest
+from ultralytics.solutions import AIGym, Analytics, DistanceCalculation, Heatmap, ObjectCounter, ParkingManagement, QueueManager, SpeedEstimator
+
+class TestAIGym:
+    def test_init(self):
+        """Test the initialization of AIGym class."""
+        gym = AIGym()
+        assert isinstance(gym, AIGym)
+
+class TestAnalytics:
+    def test_analyze_data(self):
+        """Test the analyze_data method of Analytics class."""
+        analytics = Analytics()
+        data = {"key": "value"}
+        result = analytics.analyze_data(data)
+        assert isinstance(result, dict)
+
+class TestDistanceCalculation:
+    def test_calculate_distance(self):
+        """Test the calculate_distance method of DistanceCalculation class."""
+        distance_calc = DistanceCalculation()
+        point1 = (0, 0)
+        point2 = (3, 4)
+        result = distance_calc.calculate_distance(point1, point2)
+        assert result == 5.0
+
+class TestHeatmap:
+    def test_generate_heatmap(self):
+        """Test the generate_heatmap method of Heatmap class."""
+        heatmap = Heatmap()
+        data = [[1, 2], [3, 4]]
+        result = heatmap.generate_heatmap(data)
+        assert isinstance(result, list)
+
+class TestObjectCounter:
+    def test_count_objects(self):
+        """Test the count_objects method of ObjectCounter class."""
+        counter = ObjectCounter()
+        image = "path/to/image.jpg"
+        result = counter.count_objects(image)
+        assert isinstance(result, int)
+
+class TestParkingManagement:
+    def test_select_parking_points(self):
+        """Test the select_parking_points method of ParkingManagement class."""
+        parking_manager = ParkingManagement()
+        image = "path/to/parking_lot.jpg"
+        result = parking_manager.select_parking_points(image)
+        assert isinstance(result, list)
+
+class TestQueueManager:
+    def test_manage_queue(self):
+        """Test the manage_queue method of QueueManager class."""
+        queue_manager = QueueManager()
+        people_in_queue = ["person1", "person2"]
+        result = queue_manager.manage_queue(people_in_queue)
+        assert isinstance(result, list)
+
+class TestSpeedEstimator:
+    def test_estimate_speed(self):
+        """Test the estimate_speed method of SpeedEstimator class."""
+        speed_estimator = SpeedEstimator()
+        points = [(0, 0), (10, 10)]
+        result = speed_estimator.estimate_speed(points)
+        assert isinstance(result, float)

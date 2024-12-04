@@ -1,0 +1,177 @@
+import unittest
+from ultralytics.nn import (
+    BaseModel,
+    ClassificationModel,
+    DetectionModel,
+    SegmentationModel,
+    attempt_load_one_weight,
+    attempt_load_weights,
+    guess_model_scale,
+    guess_model_task,
+    parse_model,
+    torch_safe_load,
+    yaml_model_load,
+)
+
+class TestUltralyticsNN(unittest.TestCase):
+
+    def test_attempt_load_one_weight(self):
+        """
+        Test the `attempt_load_one_weight` function with a valid weight file path.
+        """
+        # Arrange
+        weight_path = "path/to/valid/weight/file.pt"
+        
+        # Act
+        result = attempt_load_one_weight(weight_path)
+        
+        # Assert
+        self.assertIsNotNone(result)
+
+    def test_attempt_load_weights(self):
+        """
+        Test the `attempt_load_weights` function with a valid list of weight file paths.
+        """
+        # Arrange
+        weight_paths = ["path/to/valid/weight/file1.pt", "path/to/valid/weight/file2.pt"]
+        
+        # Act
+        result = attempt_load_weights(weight_paths)
+        
+        # Assert
+        self.assertIsNotNone(result)
+
+    def test_parse_model(self):
+        """
+        Test the `parse_model` function with a valid model configuration.
+        """
+        # Arrange
+        model_config = {
+            "type": "DetectionModel",
+            "backbone": "resnet50"
+        }
+        
+        # Act
+        result = parse_model(model_config)
+        
+        # Assert
+        self.assertIsInstance(result, DetectionModel)
+
+    def test_yaml_model_load(self):
+        """
+        Test the `yaml_model_load` function with a valid YAML configuration file path.
+        """
+        # Arrange
+        yaml_path = "path/to/valid/yaml/config.yaml"
+        
+        # Act
+        result = yaml_model_load(yaml_path)
+        
+        # Assert
+        self.assertIsNotNone(result)
+
+    def test_guess_model_task(self):
+        """
+        Test the `guess_model_task` function with a valid model name.
+        """
+        # Arrange
+        model_name = "ClassificationModel"
+        
+        # Act
+        result = guess_model_task(model_name)
+        
+        # Assert
+        self.assertEqual(result, "classification")
+
+    def test_guess_model_scale(self):
+        """
+        Test the `guess_model_scale` function with a valid model name.
+        """
+        # Arrange
+        model_name = "DetectionModel"
+        
+        # Act
+        result = guess_model_scale(model_name)
+        
+        # Assert
+        self.assertEqual(result, "s")
+
+    def test_torch_safe_load(self):
+        """
+        Test the `torch_safe_load` function with a valid file path.
+        """
+        # Arrange
+        file_path = "path/to/valid/file.pt"
+        
+        # Act
+        result = torch_safe_load(file_path)
+        
+        # Assert
+        self.assertIsNotNone(result)
+
+    def test_BaseModel(self):
+        """
+        Test the `BaseModel` class with a valid model configuration.
+        """
+        # Arrange
+        model_config = {
+            "type": "DetectionModel",
+            "backbone": "resnet50"
+        }
+        
+        # Act
+        model = BaseModel(model_config)
+        
+        # Assert
+        self.assertIsInstance(model, DetectionModel)
+
+    def test_ClassificationModel(self):
+        """
+        Test the `ClassificationModel` class with a valid model configuration.
+        """
+        # Arrange
+        model_config = {
+            "type": "ClassificationModel",
+            "backbone": "resnet50"
+        }
+        
+        # Act
+        model = ClassificationModel(model_config)
+        
+        # Assert
+        self.assertIsInstance(model, ClassificationModel)
+
+    def test_DetectionModel(self):
+        """
+        Test the `DetectionModel` class with a valid model configuration.
+        """
+        # Arrange
+        model_config = {
+            "type": "DetectionModel",
+            "backbone": "resnet50"
+        }
+        
+        # Act
+        model = DetectionModel(model_config)
+        
+        # Assert
+        self.assertIsInstance(model, DetectionModel)
+
+    def test_SegmentationModel(self):
+        """
+        Test the `SegmentationModel` class with a valid model configuration.
+        """
+        # Arrange
+        model_config = {
+            "type": "SegmentationModel",
+            "backbone": "resnet50"
+        }
+        
+        # Act
+        model = SegmentationModel(model_config)
+        
+        # Assert
+        self.assertIsInstance(model, SegmentationModel)
+
+if __name__ == "__main__":
+    unittest.main()

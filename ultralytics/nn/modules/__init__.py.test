@@ -1,0 +1,153 @@
+import unittest
+from ultralytics.nn.modules import Conv, Bottleneck, C3
+
+class TestModules(unittest.TestCase):
+    def test_conv_forward(self):
+        """
+        Test the forward pass of the Conv module.
+        
+        Steps:
+        1. Create an instance of Conv with specific parameters.
+        2. Generate a random input tensor.
+        3. Call the forward method on the input tensor.
+        4. Assert that the output tensor has the expected shape.
+        """
+        conv = Conv(10, 20)
+        input_tensor = torch.randn(1, 10, 32, 32)
+        output_tensor = conv(input_tensor)
+        self.assertEqual(output_tensor.shape, (1, 20, 32, 32))
+
+    def test_bottleneck_forward(self):
+        """
+        Test the forward pass of the Bottleneck module.
+        
+        Steps:
+        1. Create an instance of Bottleneck with specific parameters.
+        2. Generate a random input tensor.
+        3. Call the forward method on the input tensor.
+        4. Assert that the output tensor has the expected shape.
+        """
+        bottleneck = Bottleneck(20, 30)
+        input_tensor = torch.randn(1, 20, 32, 32)
+        output_tensor = bottleneck(input_tensor)
+        self.assertEqual(output_tensor.shape, (1, 20, 32, 32))
+
+    def test_c3_forward(self):
+        """
+        Test the forward pass of the C3 module.
+        
+        Steps:
+        1. Create an instance of C3 with specific parameters.
+        2. Generate a random input tensor.
+        3. Call the forward method on the input tensor.
+        4. Assert that the output tensor has the expected shape.
+        """
+        c3 = C3(30, 40)
+        input_tensor = torch.randn(1, 30, 32, 32)
+        output_tensor = c3(input_tensor)
+        self.assertEqual(output_tensor.shape, (1, 40, 32, 32))
+
+    def test_conv_backward(self):
+        """
+        Test the backward pass of the Conv module.
+        
+        Steps:
+        1. Create an instance of Conv with specific parameters.
+        2. Generate a random input tensor and target tensor.
+        3. Call the forward method on the input tensor to get output.
+        4. Compute the loss using mean squared error.
+        5. Call the backward method on the loss.
+        6. Assert that the gradients are computed correctly.
+        """
+        conv = Conv(10, 20)
+        input_tensor = torch.randn(1, 10, 32, 32, requires_grad=True)
+        target_tensor = torch.randn(1, 20, 32, 32)
+        output_tensor = conv(input_tensor)
+        loss = F.mse_loss(output_tensor, target_tensor)
+        loss.backward()
+        self.assertIsNotNone(input_tensor.grad)
+
+    def test_bottleneck_backward(self):
+        """
+        Test the backward pass of the Bottleneck module.
+        
+        Steps:
+        1. Create an instance of Bottleneck with specific parameters.
+        2. Generate a random input tensor and target tensor.
+        3. Call the forward method on the input tensor to get output.
+        4. Compute the loss using mean squared error.
+        5. Call the backward method on the loss.
+        6. Assert that the gradients are computed correctly.
+        """
+        bottleneck = Bottleneck(20, 30)
+        input_tensor = torch.randn(1, 20, 32, 32, requires_grad=True)
+        target_tensor = torch.randn(1, 20, 32, 32)
+        output_tensor = bottleneck(input_tensor)
+        loss = F.mse_loss(output_tensor, target_tensor)
+        loss.backward()
+        self.assertIsNotNone(input_tensor.grad)
+
+    def test_c3_backward(self):
+        """
+        Test the backward pass of the C3 module.
+        
+        Steps:
+        1. Create an instance of C3 with specific parameters.
+        2. Generate a random input tensor and target tensor.
+        3. Call the forward method on the input tensor to get output.
+        4. Compute the loss using mean squared error.
+        5. Call the backward method on the loss.
+        6. Assert that the gradients are computed correctly.
+        """
+        c3 = C3(30, 40)
+        input_tensor = torch.randn(1, 30, 32, 32, requires_grad=True)
+        target_tensor = torch.randn(1, 40, 32, 32)
+        output_tensor = c3(input_tensor)
+        loss = F.mse_loss(output_tensor, target_tensor)
+        loss.backward()
+        self.assertIsNotNone(input_tensor.grad)
+
+    def test_conv_invalid_input(self):
+        """
+        Test the forward pass of the Conv module with invalid input.
+        
+        Steps:
+        1. Create an instance of Conv with specific parameters.
+        2. Generate a random input tensor with an incorrect number of channels.
+        3. Assert that a ValueError is raised when calling the forward method.
+        """
+        conv = Conv(10, 20)
+        input_tensor = torch.randn(1, 5, 32, 32)  # Incorrect number of channels
+        with self.assertRaises(ValueError):
+            output_tensor = conv(input_tensor)
+
+    def test_bottleneck_invalid_input(self):
+        """
+        Test the forward pass of the Bottleneck module with invalid input.
+        
+        Steps:
+        1. Create an instance of Bottleneck with specific parameters.
+        2. Generate a random input tensor with an incorrect number of channels.
+        3. Assert that a ValueError is raised when calling the forward method.
+        """
+        bottleneck = Bottleneck(20, 30)
+        input_tensor = torch.randn(1, 15, 32, 32)  # Incorrect number of channels
+        with self.assertRaises(ValueError):
+            output_tensor = bottleneck(input_tensor)
+
+    def test_c3_invalid_input(self):
+        """
+        Test the forward pass of the C3 module with invalid input.
+        
+        Steps:
+        1. Create an instance of C3 with specific parameters.
+        2. Generate a random input tensor with an incorrect number of channels.
+        3. Assert that a ValueError is raised when calling the forward method.
+        """
+        c3 = C3(30, 40)
+        input_tensor = torch.randn(1, 25, 32, 32)  # Incorrect number of channels
+        with self.assertRaises(ValueError):
+            output_tensor = c3(input_tensor)
+
+if __name__ == '__main__':
+    unittest.main()

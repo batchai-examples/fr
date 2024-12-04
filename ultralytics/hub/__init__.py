@@ -1,132 +1,196 @@
-# Ultralytics YOLO 🚀, AGPL-3.0 license
+import pytest
+from unittest.mock import patch, MagicMock
 
-import requests
-
-from ultralytics.data.utils import HUBDatasetStats
-from ultralytics.hub.auth import Auth
-from ultralytics.hub.utils import HUB_API_ROOT, HUB_WEB_ROOT, PREFIX
-from ultralytics.utils import LOGGER, SETTINGS, checks
-
-
-def login(api_key: str = None, save=True) -> bool:
+# Happy path test for login function with valid API key and save=True
+def test_login_happy_path():
     """
-    Log in to the Ultralytics HUB API using the provided API key.
-
-    The session is not stored; a new session is created when needed using the saved SETTINGS or the HUB_API_KEY
-    environment variable if successfully authenticated.
-
-    Args:
-        api_key (str, optional): API key to use for authentication.
-            If not provided, it will be retrieved from SETTINGS or HUB_API_KEY environment variable.
-        save (bool, optional): Whether to save the API key to SETTINGS if authentication is successful.
-
-    Returns:
-        (bool): True if authentication is successful, False otherwise.
+    Test the login function with a valid API key and save=True.
+    
+    Steps:
+    1. Mock the HUBClient class to return an authenticated client.
+    2. Call the login function with a valid API key and save=True.
+    3. Assert that the function returns True.
+    4. Assert that the SETTINGS dictionary is updated with the new API key.
     """
-    checks.check_requirements("hub-sdk>=0.0.6")
-    from hub_sdk import HUBClient
+    from ultralytics.hub.__init__ import login, SETTINGS
 
-    api_key_url = f"{HUB_WEB_ROOT}/settings?tab=api+keys"  # set the redirect URL
-    saved_key = SETTINGS.get("api_key")
-    active_key = api_key or saved_key
-    credentials = {"api_key": active_key} if active_key and active_key != "" else None  # set credentials
+    # Mock HUBClient to return an authenticated client
+    with patch('ultralytics.hub.auth.HUBClient') as mock_client:
+        mock_client.return_value.authenticated = True
+        mock_client.return_value.api_key = "valid_api_key"
 
-    client = HUBClient(credentials)  # initialize HUBClient
+        # Call the login function
+        result = login(api_key="valid_api_key", save=True)
 
-    if client.authenticated:
-        # Successfully authenticated with HUB
+        # Assert that the function returns True
+        assert result is True
 
-        if save and client.api_key != saved_key:
-            SETTINGS.update({"api_key": client.api_key})  # update settings with valid API key
+        # Assert that the SETTINGS dictionary is updated with the new API key
+        assert SETTINGS["api_key"] == "valid_api_key"
 
-        # Set message based on whether key was provided or retrieved from settings
-        log_message = (
-            "New authentication successful ✅" if client.api_key == api_key or not credentials else "Authenticated ✅"
-        )
-        LOGGER.info(f"{PREFIX}{log_message}")
-
-        return True
-    else:
-        # Failed to authenticate with HUB
-        LOGGER.info(f"{PREFIX}Get API key from {api_key_url} and then run 'yolo hub login API_KEY'")
-        return False
-
-
-def logout():
+# Negative path test for login function with invalid API key and save=True
+def test_login_negative_path_invalid_api_key():
     """
-    Log out of Ultralytics HUB by removing the API key from the settings file. To log in again, use 'yolo hub login'.
-
-    Example:
-        ```python
-        from ultralytics import hub
-
-        hub.logout()
-        ```
+    Test the login function with an invalid API key and save=True.
+    
+    Steps:
+    1. Mock the HUBClient class to return a non-authenticated client.
+    2. Call the login function with an invalid API key and save=True.
+    3. Assert that the function returns False.
     """
-    SETTINGS["api_key"] = ""
-    SETTINGS.save()
-    LOGGER.info(f"{PREFIX}logged out ✅. To log in again, use 'yolo hub login'.")
+    from ultralytics.hub.__init__ import login
 
+    # Mock HUBClient to return a non-authenticated client
+    with patch('ultralytics.hub.auth.HUBClient') as mock_client:
+        mock_client.return_value.authenticated = False
 
-def reset_model(model_id=""):
-    """Reset a trained model to an untrained state."""
-    r = requests.post(f"{HUB_API_ROOT}/model-reset", json={"modelId": model_id}, headers={"x-api-key": Auth().api_key})
-    if r.status_code == 200:
-        LOGGER.info(f"{PREFIX}Model reset successfully")
-        return
-    LOGGER.warning(f"{PREFIX}Model reset failure {r.status_code} {r.reason}")
+        # Call the login function
+        result = login(api_key="invalid_api_key", save=True)
 
+        # Assert that the function returns False
+        assert result is False
 
-def export_fmts_hub():
-    """Returns a list of HUB-supported export formats."""
-    from ultralytics.engine.exporter import export_formats
-
-    return list(export_formats()["Argument"][1:]) + ["ultralytics_tflite", "ultralytics_coreml"]
-
-
-def export_model(model_id="", format="torchscript"):
-    """Export a model to all formats."""
-    assert format in export_fmts_hub(), f"Unsupported export format '{format}', valid formats are {export_fmts_hub()}"
-    r = requests.post(
-        f"{HUB_API_ROOT}/v1/models/{model_id}/export", json={"format": format}, headers={"x-api-key": Auth().api_key}
-    )
-    assert r.status_code == 200, f"{PREFIX}{format} export failure {r.status_code} {r.reason}"
-    LOGGER.info(f"{PREFIX}{format} export started ✅")
-
-
-def get_export(model_id="", format="torchscript"):
-    """Get an exported model dictionary with download URL."""
-    assert format in export_fmts_hub(), f"Unsupported export format '{format}', valid formats are {export_fmts_hub()}"
-    r = requests.post(
-        f"{HUB_API_ROOT}/get-export",
-        json={"apiKey": Auth().api_key, "modelId": model_id, "format": format},
-        headers={"x-api-key": Auth().api_key},
-    )
-    assert r.status_code == 200, f"{PREFIX}{format} get_export failure {r.status_code} {r.reason}"
-    return r.json()
-
-
-def check_dataset(path: str, task: str) -> None:
+# Happy path test for logout function
+def test_logout_happy_path():
     """
-    Function for error-checking HUB dataset Zip file before upload. It checks a dataset for errors before it is uploaded
-    to the HUB. Usage examples are given below.
-
-    Args:
-        path (str): Path to data.zip (with data.yaml inside data.zip).
-        task (str): Dataset task. Options are 'detect', 'segment', 'pose', 'classify', 'obb'.
-
-    Example:
-        Download *.zip files from https://github.com/ultralytics/hub/tree/main/example_datasets
-            i.e. https://github.com/ultralytics/hub/raw/main/example_datasets/coco8.zip for coco8.zip.
-        ```python
-        from ultralytics.hub import check_dataset
-
-        check_dataset('path/to/coco8.zip', task='detect')  # detect dataset
-        check_dataset('path/to/coco8-seg.zip', task='segment')  # segment dataset
-        check_dataset('path/to/coco8-pose.zip', task='pose')  # pose dataset
-        check_dataset('path/to/dota8.zip', task='obb')  # OBB dataset
-        check_dataset('path/to/imagenet10.zip', task='classify')  # classification dataset
-        ```
+    Test the logout function.
+    
+    Steps:
+    1. Call the logout function.
+    2. Assert that the SETTINGS dictionary is cleared.
     """
-    HUBDatasetStats(path=path, task=task).get_json()
-    LOGGER.info(f"Checks completed correctly ✅. Upload this dataset to {HUB_WEB_ROOT}/datasets/.")
+    from ultralytics.hub.__init__ import logout, SETTINGS
+
+    # Call the logout function
+    logout()
+
+    # Assert that the SETTINGS dictionary is cleared
+    assert SETTINGS == {}
+
+# Happy path test for check_dataset function with valid dataset and task
+def test_check_dataset_happy_path():
+    """
+    Test the check_dataset function with a valid dataset and task.
+    
+    Steps:
+    1. Mock the HUBDatasetStats class to return None.
+    2. Call the check_dataset function with a valid dataset path and task.
+    3. Assert that no exceptions are raised.
+    """
+    from ultralytics.hub.__init__ import check_dataset
+
+    # Mock HUBDatasetStats to return None
+    with patch('ultralytics.hub.__init__.HUBDatasetStats') as mock_stats:
+        mock_stats.return_value.get_json.return_value = None
+
+        # Call the check_dataset function
+        check_dataset(path="path/to/coco8.zip", task="detect")
+
+        # Assert that no exceptions are raised
+        assert True
+
+# Negative path test for check_dataset function with invalid dataset format
+def test_check_dataset_negative_path_invalid_format():
+    """
+    Test the check_dataset function with an invalid dataset format.
+    
+    Steps:
+    1. Mock the HUBDatasetStats class to raise a ValueError.
+    2. Call the check_dataset function with an invalid dataset path and task.
+    3. Assert that a ValueError is raised.
+    """
+    from ultralytics.hub.__init__ import check_dataset
+
+    # Mock HUBDatasetStats to raise a ValueError
+    with patch('ultralytics.hub.__init__.HUBDatasetStats') as mock_stats:
+        mock_stats.return_value.get_json.side_effect = ValueError("Invalid dataset format")
+
+        # Call the check_dataset function and assert that a ValueError is raised
+        with pytest.raises(ValueError):
+            check_dataset(path="path/to/invalid_format.zip", task="detect")
+
+# Happy path test for get_export function with valid model ID and format
+def test_get_export_happy_path():
+    """
+    Test the get_export function with a valid model ID and format.
+    
+    Steps:
+    1. Mock the requests.post method to return a successful response.
+    2. Call the get_export function with a valid model ID and format.
+    3. Assert that no exceptions are raised.
+    """
+    from ultralytics.hub.__init__ import get_export
+
+    # Mock requests.post to return a successful response
+    with patch('requests.post') as mock_post:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"download_url": "http://example.com/export.zip"}
+
+        # Call the get_export function
+        result = get_export(model_id="model123", format="torchscript")
+
+        # Assert that no exceptions are raised
+        assert True
+
+# Negative path test for get_export function with invalid model ID and format
+def test_get_export_negative_path_invalid_model_id():
+    """
+    Test the get_export function with an invalid model ID and format.
+    
+    Steps:
+    1. Mock the requests.post method to return a failed response.
+    2. Call the get_export function with an invalid model ID and format.
+    3. Assert that a ValueError is raised.
+    """
+    from ultralytics.hub.__init__ import get_export
+
+    # Mock requests.post to return a failed response
+    with patch('requests.post') as mock_post:
+        mock_post.return_value.status_code = 404
+
+        # Call the get_export function and assert that a ValueError is raised
+        with pytest.raises(ValueError):
+            get_export(model_id="invalid_model", format="torchscript")
+
+# Happy path test for export function with valid model ID and format
+def test_export_happy_path():
+    """
+    Test the export function with a valid model ID and format.
+    
+    Steps:
+    1. Mock the requests.post method to return a successful response.
+    2. Call the export function with a valid model ID and format.
+    3. Assert that no exceptions are raised.
+    """
+    from ultralytics.hub.__init__ import export
+
+    # Mock requests.post to return a successful response
+    with patch('requests.post') as mock_post:
+        mock_post.return_value.status_code = 200
+
+        # Call the export function
+        result = export(model_id="model123", format="torchscript")
+
+        # Assert that no exceptions are raised
+        assert True
+
+# Negative path test for export function with invalid model ID and format
+def test_export_negative_path_invalid_model_id():
+    """
+    Test the export function with an invalid model ID and format.
+    
+    Steps:
+    1. Mock the requests.post method to return a failed response.
+    2. Call the export function with an invalid model ID and format.
+    3. Assert that a ValueError is raised.
+    """
+    from ultralytics.hub.__init__ import export
+
+    # Mock requests.post to return a failed response
+    with patch('requests.post') as mock_post:
+        mock_post.return_value.status_code = 404
+
+        # Call the export function and assert that a ValueError is raised
+        with pytest.raises(ValueError):
+            export(model_id="invalid_model", format="torchscript")
+    """

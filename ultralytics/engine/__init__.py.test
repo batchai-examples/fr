@@ -1,0 +1,61 @@
+import unittest
+
+class TestInit(unittest.TestCase):
+    """
+    Test cases for the __init__.py file in Ultralytics YOLO.
+    
+    This test suite includes tests for both happy path and negative scenarios.
+    """
+
+    def test_init_file_exists(self):
+        """
+        Test that the __init__.py file exists.
+        
+        Steps:
+        1. Check if the file exists at the specified path.
+        2. Assert that the file is not empty.
+        """
+        import os
+        self.assertTrue(os.path.exists("ultralytics/engine/__init__.py"))
+        with open("ultralytics/engine/__init__.py", "r") as file:
+            content = file.read()
+            self.assertNotEqual(content.strip(), "")
+
+    def test_init_file_content(self):
+        """
+        Test that the __init__.py file contains expected content.
+        
+        Steps:
+        1. Read the content of the __init__.py file.
+        2. Assert that the content matches the expected AGPL-3.0 license header.
+        """
+        with open("ultralytics/engine/__init__.py", "r") as file:
+            content = file.read()
+            self.assertIn("# Ultralytics YOLO 🚀, AGPL-3.0 license", content)
+
+    def test_init_file_empty(self):
+        """
+        Test that the __init__.py file is not empty.
+        
+        Steps:
+        1. Read the content of the __init__.py file.
+        2. Assert that the content is not empty.
+        """
+        with open("ultralytics/engine/__init__.py", "r") as file:
+            content = file.read()
+            self.assertNotEqual(content.strip(), "")
+
+    def test_init_file_missing_license(self):
+        """
+        Test that the __init__.py file does not contain a missing license header.
+        
+        Steps:
+        1. Read the content of the __init__.py file.
+        2. Assert that the AGPL-3.0 license header is present in the file.
+        """
+        with open("ultralytics/engine/__init__.py", "r") as file:
+            content = file.read()
+            self.assertIn("# Ultralytics YOLO 🚀, AGPL-3.0 license", content)
+
+if __name__ == "__main__":
+    unittest.main()

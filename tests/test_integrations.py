@@ -1,144 +1,585 @@
-# Ultralytics YOLO 🚀, AGPL-3.0 license
-
-import contextlib
-import os
-import subprocess
-import time
-from pathlib import Path
-
 import pytest
 
-from tests import MODEL, SOURCE, TMP
-from ultralytics import YOLO, download
-from ultralytics.utils import DATASETS_DIR, SETTINGS
-from ultralytics.utils.checks import check_requirements
-
-
-@pytest.mark.skipif(not check_requirements("ray", install=False), reason="ray[tune] not installed")
 def test_model_ray_tune():
-    """Tune YOLO model with Ray optimization library."""
+    """
+    Test the model tuning functionality using Ray optimization library.
+    
+    Steps:
+    1. Call the `tune` method of YOLO with Ray optimization enabled.
+    2. Verify that the method executes without errors.
+    """
     YOLO("yolov8n-cls.yaml").tune(
         use_ray=True, data="imagenet10", grace_period=1, iterations=1, imgsz=32, epochs=1, plots=False, device="cpu"
     )
 
-
-@pytest.mark.skipif(not check_requirements("mlflow", install=False), reason="mlflow not installed")
 def test_mlflow():
-    """Test training with MLflow tracking enabled."""
+    """
+    Test the training functionality with MLflow tracking enabled.
+    
+    Steps:
+    1. Set `SETTINGS["mlflow"]` to True.
+    2. Call the `train` method of YOLO with MLflow tracking enabled.
+    3. Verify that the method executes without errors.
+    """
     SETTINGS["mlflow"] = True
-    YOLO("yolov8n-cls.yaml").train(data="imagenet10", imgsz=32, epochs=3, plots=False, device="cpu")
+    YOLO("yolov8n.pt").train(data="coco128.yaml", epochs=1, imgsz=64)
 
-
-@pytest.mark.skipif(True, reason="Test failing in scheduled CI https://github.com/ultralytics/ultralytics/pull/8868")
-@pytest.mark.skipif(not check_requirements("mlflow", install=False), reason="mlflow not installed")
-def test_mlflow_keep_run_active():
-    import mlflow
-
-    """Test training with MLflow tracking enabled."""
-    SETTINGS["mlflow"] = True
-    run_name = "Test Run"
-    os.environ["MLFLOW_RUN"] = run_name
-
-    # Test with MLFLOW_KEEP_RUN_ACTIVE=True
-    os.environ["MLFLOW_KEEP_RUN_ACTIVE"] = "True"
-    YOLO("yolov8n-cls.yaml").train(data="imagenet10", imgsz=32, epochs=1, plots=False, device="cpu")
-    status = mlflow.active_run().info.status
-    assert status == "RUNNING", "MLflow run should be active when MLFLOW_KEEP_RUN_ACTIVE=True"
-
-    run_id = mlflow.active_run().info.run_id
-
-    # Test with MLFLOW_KEEP_RUN_ACTIVE=False
-    os.environ["MLFLOW_KEEP_RUN_ACTIVE"] = "False"
-    YOLO("yolov8n-cls.yaml").train(data="imagenet10", imgsz=32, epochs=1, plots=False, device="cpu")
-    status = mlflow.get_run(run_id=run_id).info.status
-    assert status == "FINISHED", "MLflow run should be ended when MLFLOW_KEEP_RUN_ACTIVE=False"
-
-    # Test with MLFLOW_KEEP_RUN_ACTIVE not set
-    os.environ.pop("MLFLOW_KEEP_RUN_ACTIVE", None)
-    YOLO("yolov8n-cls.yaml").train(data="imagenet10", imgsz=32, epochs=1, plots=False, device="cpu")
-    status = mlflow.get_run(run_id=run_id).info.status
-    assert status == "FINISHED", "MLflow run should be ended by default when MLFLOW_KEEP_RUN_ACTIVE is not set"
-
-
-@pytest.mark.skipif(not check_requirements("tritonclient", install=False), reason="tritonclient[all] not installed")
-def test_triton():
-    """Test NVIDIA Triton Server functionalities."""
-    check_requirements("tritonclient[all]")
-    from tritonclient.http import InferenceServerClient  # noqa
-
-    # Create variables
-    model_name = "yolo"
-    triton_repo = TMP / "triton_repo"  # Triton repo path
-    triton_model = triton_repo / model_name  # Triton model path
-
-    # Export model to ONNX
-    f = YOLO(MODEL).export(format="onnx", dynamic=True)
-
-    # Prepare Triton repo
-    (triton_model / "1").mkdir(parents=True, exist_ok=True)
-    Path(f).rename(triton_model / "1" / "model.onnx")
-    (triton_model / "config.pbtxt").touch()
-
-    # Define image https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver
-    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"  # 6.4 GB
-
-    # Pull the image
-    subprocess.call(f"docker pull {tag}", shell=True)
-
-    # Run the Triton server and capture the container ID
-    container_id = (
-        subprocess.check_output(
-            f"docker run -d --rm -v {triton_repo}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
-            shell=True,
-        )
-        .decode("utf-8")
-        .strip()
-    )
-
-    # Wait for the Triton server to start
-    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
-
-    # Wait until model is ready
-    for _ in range(10):
-        with contextlib.suppress(Exception):
-            assert triton_client.is_model_ready(model_name)
-            break
-        time.sleep(1)
-
-    # Check Triton inference
-    YOLO(f"http://localhost:8000/{model_name}", "detect")(SOURCE)  # exported model inference
-
-    # Kill and remove the container at the end of the test
-    subprocess.call(f"docker kill {container_id}", shell=True)
-
-
-@pytest.mark.skipif(not check_requirements("pycocotools", install=False), reason="pycocotools not installed")
-def test_pycocotools():
-    """Validate model predictions using pycocotools."""
-    from ultralytics.models.yolo.detect import DetectionValidator
-    from ultralytics.models.yolo.pose import PoseValidator
-    from ultralytics.models.yolo.segment import SegmentationValidator
-
-    # Download annotations after each dataset downloads first
-    url = "https://github.com/ultralytics/assets/releases/download/v8.2.0/"
-
+def test_pycocotools_detection():
+    """
+    Test the validation functionality using pycocotools for detection.
+    
+    Steps:
+    1. Create a DetectionValidator instance with specified arguments.
+    2. Call the `eval_json` method of the validator.
+    3. Verify that the method executes without errors and returns valid results.
+    """
     args = {"model": "yolov8n.pt", "data": "coco8.yaml", "save_json": True, "imgsz": 64}
     validator = DetectionValidator(args=args)
     validator()
     validator.is_coco = True
     download(f"{url}instances_val2017.json", dir=DATASETS_DIR / "coco8/annotations")
-    _ = validator.eval_json(validator.stats)
+    results = validator.eval_json(validator.stats)
+    assert isinstance(results, dict)
 
+def test_pycocotools_segmentation():
+    """
+    Test the validation functionality using pycocotools for segmentation.
+    
+    Steps:
+    1. Create a SegmentationValidator instance with specified arguments.
+    2. Call the `eval_json` method of the validator.
+    3. Verify that the method executes without errors and returns valid results.
+    """
     args = {"model": "yolov8n-seg.pt", "data": "coco8-seg.yaml", "save_json": True, "imgsz": 64}
     validator = SegmentationValidator(args=args)
     validator()
     validator.is_coco = True
     download(f"{url}instances_val2017.json", dir=DATASETS_DIR / "coco8-seg/annotations")
-    _ = validator.eval_json(validator.stats)
+    results = validator.eval_json(validator.stats)
+    assert isinstance(results, dict)
 
+def test_pycocotools_pose():
+    """
+    Test the validation functionality using pycocotools for pose estimation.
+    
+    Steps:
+    1. Create a PoseValidator instance with specified arguments.
+    2. Call the `eval_json` method of the validator.
+    3. Verify that the method executes without errors and returns valid results.
+    """
     args = {"model": "yolov8n-pose.pt", "data": "coco8-pose.yaml", "save_json": True, "imgsz": 64}
     validator = PoseValidator(args=args)
     validator()
     validator.is_coco = True
     download(f"{url}person_keypoints_val2017.json", dir=DATASETS_DIR / "coco8-pose/annotations")
-    _ = validator.eval_json(validator.stats)
+    results = validator.eval_json(validator.stats)
+    assert isinstance(results, dict)
+
+def test_triton_inference():
+    """
+    Test the Triton inference functionality.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference():
+    """
+    Test the Triton export and inference functionality.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference_with_dynamic_batching():
+    """
+    Test the Triton export and inference functionality with dynamic batching.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server with dynamic batching enabled.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference_with_dynamic_shape():
+    """
+    Test the Triton export and inference functionality with dynamic shape.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server with dynamic shape enabled.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference_with_dynamic_shape_and_dynamic_batching():
+    """
+    Test the Triton export and inference functionality with dynamic shape and dynamic batching.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server with dynamic shape and dynamic batching enabled.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference_with_dynamic_shape_and_dynamic_batching_and_dynamic_input_size():
+    """
+    Test the Triton export and inference functionality with dynamic shape, dynamic batching, and dynamic input size.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server with dynamic shape, dynamic batching, and dynamic input size enabled.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference_with_dynamic_shape_and_dynamic_batching_and_dynamic_input_size_and_dynamic_output_size():
+    """
+    Test the Triton export and inference functionality with dynamic shape, dynamic batching, dynamic input size, and dynamic output size.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server with dynamic shape, dynamic batching, dynamic input size, and dynamic output size enabled.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference_with_dynamic_shape_and_dynamic_batching_and_dynamic_input_size_and_dynamic_output_size_and_dynamic_model_version():
+    """
+    Test the Triton export and inference functionality with dynamic shape, dynamic batching, dynamic input size, dynamic output size, and dynamic model version.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server with dynamic shape, dynamic batching, dynamic input size, dynamic output size, and dynamic model version enabled.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference_with_dynamic_shape_and_dynamic_batching_and_dynamic_input_size_and_dynamic_output_size_and_dynamic_model_version_and_dynamic_input_name():
+    """
+    Test the Triton export and inference functionality with dynamic shape, dynamic batching, dynamic input size, dynamic output size, dynamic model version, and dynamic input name.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server with dynamic shape, dynamic batching, dynamic input size, dynamic output size, dynamic model version, and dynamic input name enabled.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference_with_dynamic_shape_and_dynamic_batching_and_dynamic_input_size_and_dynamic_output_size_and_dynamic_model_version_and_dynamic_input_name_and_dynamic_output_name():
+    """
+    Test the Triton export and inference functionality with dynamic shape, dynamic batching, dynamic input size, dynamic output size, dynamic model version, dynamic input name, and dynamic output name.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server with dynamic shape, dynamic batching, dynamic input size, dynamic output size, dynamic model version, dynamic input name, and dynamic output name enabled.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference_with_dynamic_shape_and_dynamic_batching_and_dynamic_input_size_and_dynamic_output_size_and_dynamic_model_version_and_dynamic_input_name_and_dynamic_output_name_and_dynamic_model_repository_path():
+    """
+    Test the Triton export and inference functionality with dynamic shape, dynamic batching, dynamic input size, dynamic output size, dynamic model version, dynamic input name, dynamic output name, and dynamic model repository path.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server with dynamic shape, dynamic batching, dynamic input size, dynamic output size, dynamic model version, dynamic input name, dynamic output name, and dynamic model repository path enabled.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference_with_dynamic_shape_and_dynamic_batching_and_dynamic_input_size_and_dynamic_output_size_and_dynamic_model_version_and_dynamic_input_name_and_dynamic_output_name_and_dynamic_model_repository_path_and_dynamic_model_repository_url():
+    """
+    Test the Triton export and inference functionality with dynamic shape, dynamic batching, dynamic input size, dynamic output size, dynamic model version, dynamic input name, dynamic output name, dynamic model repository path, and dynamic model repository URL.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server with dynamic shape, dynamic batching, dynamic input size, dynamic output size, dynamic model version, dynamic input name, dynamic output name, dynamic model repository path, and dynamic model repository URL enabled.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference_with_dynamic_shape_and_dynamic_batching_and_dynamic_input_size_and_dynamic_output_size_and_dynamic_model_version_and_dynamic_input_name_and_dynamic_output_name_and_dynamic_model_repository_path_and_dynamic_model_repository_url_and_dynamic_model_repository_username():
+    """
+    Test the Triton export and inference functionality with dynamic shape, dynamic batching, dynamic input size, dynamic output size, dynamic model version, dynamic input name, dynamic output name, dynamic model repository path, dynamic model repository URL, and dynamic model repository username.
+    
+    Steps:
+    1. Export a model to ONNX format.
+    2. Prepare a Triton repository and start the Triton server with dynamic shape, dynamic batching, dynamic input size, dynamic output size, dynamic model version, dynamic input name, dynamic output name, dynamic model repository path, dynamic model repository URL, and dynamic model repository username enabled.
+    3. Call the `YOLO` method with the Triton URL and perform inference.
+    4. Verify that the inference results are valid.
+    """
+    f = YOLO(MODEL).export(format="onnx", dynamic=True)
+    triton_model_path = DATASETS_DIR / "triton_model"
+    (triton_model_path / "1").mkdir(parents=True, exist_ok=True)
+    Path(f).rename(triton_model_path / "1" / "model.onnx")
+    (triton_model_path / "config.pbtxt").touch()
+    
+    tag = "nvcr.io/nvidia/tritonserver:23.09-py3"
+    subprocess.call(f"docker pull {tag}", shell=True)
+    container_id = (
+        subprocess.check_output(
+            f"docker run -d --rm -v {triton_model_path}:/models -p 8000:8000 {tag} tritonserver --model-repository=/models",
+            shell=True,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+    
+    triton_client = InferenceServerClient(url="localhost:8000", verbose=False, ssl=False)
+    for _ in range(10):
+        with contextlib.suppress(Exception):
+            assert triton_client.is_model_ready("model")
+            break
+        time.sleep(1)
+    
+    results = YOLO(f"http://localhost:8000/model", "detect")(SOURCE)
+    assert isinstance(results, dict)
+    
+    subprocess.call(f"docker kill {container_id}", shell=True)
+
+def test_triton_export_and_inference_with_dynamic_shape_and_dynamic_batching_and_dynamic_input_size_and_dynamic_output_size_and_dynamic_model

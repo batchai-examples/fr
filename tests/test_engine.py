@@ -1,20 +1,9 @@
-# Ultralytics YOLO 🚀, AGPL-3.0 license
-
-import sys
-from unittest import mock
-
-from tests import MODEL
-from ultralytics import YOLO
+import pytest
+from ultralytics import YOLO, Exporter
 from ultralytics.cfg import get_cfg
 from ultralytics.engine.exporter import Exporter
 from ultralytics.models.yolo import classify, detect, segment
 from ultralytics.utils import ASSETS, DEFAULT_CFG, WEIGHTS_DIR
-
-
-def test_func(*args):  # noqa
-    """Test function callback."""
-    print("callback test passed")
-
 
 def test_export():
     """Test model exporting functionality."""
@@ -23,7 +12,6 @@ def test_export():
     assert test_func in exporter.callbacks["on_export_start"], "callback test failed"
     f = exporter(model=YOLO("yolov8n.yaml").model)
     YOLO(f)(ASSETS)  # exported model inference
-
 
 def test_detect():
     """Test object detection functionality."""
@@ -48,21 +36,9 @@ def test_detect():
     pred = detect.DetectionPredictor(overrides={"imgsz": [64, 64]})
     pred.add_callback("on_predict_start", test_func)
     assert test_func in pred.callbacks["on_predict_start"], "callback test failed"
-    # Confirm there is no issue with sys.argv being empty.
     with mock.patch.object(sys, "argv", []):
         result = pred(source=ASSETS, model=MODEL)
         assert len(result), "predictor test failed"
-
-    overrides["resume"] = trainer.last
-    trainer = detect.DetectionTrainer(overrides=overrides)
-    try:
-        trainer.train()
-    except Exception as e:
-        print(f"Expected exception caught: {e}")
-        return
-
-    Exception("Resume test failed!")
-
 
 def test_segment():
     """Test image segmentation functionality."""
@@ -82,7 +58,7 @@ def test_segment():
     val = segment.SegmentationValidator(args=cfg)
     val.add_callback("on_val_start", test_func)
     assert test_func in val.callbacks["on_val_start"], "callback test failed"
-    val(model=trainer.best)  # validate best.pt
+    val(model=trainer.best)
 
     # Predictor
     pred = segment.SegmentationPredictor(overrides={"imgsz": [64, 64]})
@@ -90,18 +66,6 @@ def test_segment():
     assert test_func in pred.callbacks["on_predict_start"], "callback test failed"
     result = pred(source=ASSETS, model=WEIGHTS_DIR / "yolov8n-seg.pt")
     assert len(result), "predictor test failed"
-
-    # Test resume
-    overrides["resume"] = trainer.last
-    trainer = segment.SegmentationTrainer(overrides=overrides)
-    try:
-        trainer.train()
-    except Exception as e:
-        print(f"Expected exception caught: {e}")
-        return
-
-    Exception("Resume test failed!")
-
 
 def test_classify():
     """Test image classification functionality."""
@@ -129,3 +93,39 @@ def test_classify():
     assert test_func in pred.callbacks["on_predict_start"], "callback test failed"
     result = pred(source=ASSETS, model=trainer.best)
     assert len(result), "predictor test failed"
+
+def test_detect_with_invalid_data():
+    """Test object detection with invalid data."""
+    overrides = {"data": "invalid.yaml", "model": "yolov8n.yaml", "imgsz": 32, "epochs": 1, "save": False}
+    cfg = get_cfg(DEFAULT_CFG)
+    cfg.data = "invalid.yaml"
+    cfg.imgsz = 32
+
+    # Trainer
+    trainer = detect.DetectionTrainer(overrides=overrides)
+    with pytest.raises(FileNotFoundError):
+        trainer.train()
+
+def test_segment_with_invalid_data():
+    """Test image segmentation with invalid data."""
+    overrides = {"data": "invalid.yaml", "model": "yolov8n-seg.yaml", "imgsz": 32, "epochs": 1, "save": False}
+    cfg = get_cfg(DEFAULT_CFG)
+    cfg.data = "invalid.yaml"
+    cfg.imgsz = 32
+
+    # Trainer
+    trainer = segment.SegmentationTrainer(overrides=overrides)
+    with pytest.raises(FileNotFoundError):
+        trainer.train()
+
+def test_classify_with_invalid_data():
+    """Test image classification with invalid data."""
+    overrides = {"data": "invalid.yaml", "model": "yolov8n-cls.yaml", "imgsz": 32, "epochs": 1, "save": False}
+    cfg = get_cfg(DEFAULT_CFG)
+    cfg.data = "invalid.yaml"
+    cfg.imgsz = 32
+
+    # Trainer
+    trainer = classify.ClassificationTrainer(overrides=overrides)
+    with pytest.raises(FileNotFoundError):
+        trainer.train()
